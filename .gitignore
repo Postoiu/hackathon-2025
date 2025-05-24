@@ -5,3 +5,4 @@ vendor
 database/db.sqlite
 var/*
 !var/.gitkeep
+.vscode
