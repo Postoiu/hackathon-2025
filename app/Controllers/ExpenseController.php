@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Controllers;
 
 use App\Domain\Service\ExpenseService;
+use App\Infrastructure\Persistence\PdoUserRepository;
+use DateTimeImmutable;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 use Slim\Views\Twig;
@@ -16,6 +18,7 @@ class ExpenseController extends BaseController
     public function __construct(
         Twig $view,
         private readonly ExpenseService $expenseService,
+        private readonly PdoUserRepository $userPdo,
     ) {
         parent::__construct($view);
     }
@@ -30,16 +33,31 @@ class ExpenseController extends BaseController
         // - use the expense service to fetch expenses for the current user
 
         // parse request parameters
-        $userId = 1; // TODO: obtain logged-in user ID from session
+        $userId = $_SESSION['user_id']; // TODO: obtain logged-in user ID from session
+        $user = $this->userPdo->find($userId);
         $page = (int)($request->getQueryParams()['page'] ?? 1);
         $pageSize = (int)($request->getQueryParams()['pageSize'] ?? self::PAGE_SIZE);
+        $year = (int)($request->getQueryParams()['year'] ?? date('Y'));
+        $month = (int)($request->getQueryParams()['month'] ?? date('m'));
 
-        $expenses = $this->expenseService->list($userId, $page, $pageSize);
+        $expenses = $this->expenseService->list($user, $year, $month, $page, $pageSize);
+        $allYears = $this->expenseService->listYears($user);
+
+        $totalExpensesCount = $this->expenseService->countExpenses($user, $year, $month);
+        $totalPages = ceil($totalExpensesCount / self::PAGE_SIZE);
+        
+        $queryParams = http_build_query([ 'year' => $request->getQueryParams()['year'], 'month' => $request->getQueryParams()['month'] ]);
+        $curentUrl = "/expenses?$queryParams";
 
         return $this->render($response, 'expenses/index.twig', [
             'expenses' => $expenses,
             'page'     => $page,
             'pageSize' => $pageSize,
+            'year' => strval($year),
+            'month' => strval($month),
+            'allYears' => $allYears,
+            'totalPages' => $totalPages,
+            'currentUrl' => $curentUrl,
         ]);
     }
 
@@ -49,8 +67,9 @@ class ExpenseController extends BaseController
 
         // Hints:
         // - obtain the list of available categories from configuration and pass to the view
+        $categories = json_decode($_ENV['EXPENSE_CATEGORIES'], true);
 
-        return $this->render($response, 'expenses/create.twig', ['categories' => []]);
+        return $this->render($response, 'expenses/create.twig', ['categories' => $categories]);
     }
 
     public function store(Request $request, Response $response): Response
@@ -63,7 +82,43 @@ class ExpenseController extends BaseController
         // - rerender the "expenses.create" page with included errors in case of failure
         // - redirect to the "expenses.index" page in case of success
 
-        return $response;
+        $errors = [];
+        $userId = $_SESSION['user_id'];
+        $user = $this->userPdo->find($userId);
+        $categories = json_decode($_ENV['EXPENSE_CATEGORIES'], true);
+
+        if (!$user) {
+            $errors['user'] = 'User not found!';
+        }
+
+        $data = $request->getParsedBody();
+        $amount = floatval($data['amount'] ?? 0);
+        $inputDate = new DateTimeImmutable($data['date']);
+        $today = new DateTimeImmutable();
+
+        if ($inputDate > $today) {
+            $errors['date'] = 'The date can not be in future!';
+        }
+
+        if ($data['category'] === '') {
+            $errors['category'] = 'Please select a category';
+        }
+
+        if ($amount <= 0) {
+            $errors['amount'] = 'Please enter a valid amount value';
+        }
+
+        if ($data['description'] === '') {
+            $errors['description'] = 'Please enter a description';
+        }
+
+        if (!empty($errors)) {
+            return $this->render($response,'expenses/create.twig', ['errors' => $errors, 'categories' => $categories]);
+        }
+
+        $this->expenseService->create($user, $amount, $data['description'], $inputDate, $data['category']);
+
+        return $response->withHeader('Location', '/expenses')->withStatus(302);
     }
 
     public function edit(Request $request, Response $response, array $routeParams): Response
