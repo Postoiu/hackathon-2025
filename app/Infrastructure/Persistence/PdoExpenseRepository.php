@@ -36,9 +36,9 @@ class PdoExpenseRepository implements ExpenseRepositoryInterface
     public function save(Expense $expense): void
     {
         // TODO: Implement save() method.
-        $query = 'INSERT INTO expenses (user_id, date, category, amount_cents, description) VALUES (:userId, :date, :category, :amount, :description)';
+        $query = 'INSERT INTO expenses (id, user_id, date, category, amount_cents, description) VALUES (:id, :userId, :date, :category, :amount, :description) ON CONFLICT(id) DO UPDATE SET date=:date, category=:category, amount_cents=:amount, description=:description';
         $statement = $this->pdo->prepare($query);
-        $statement->execute(['userId' => $expense->userId, 'date' => $expense->date->format('Y-m-d H:i:s'), 'category' => $expense->category, 'amount' => $expense->amountCents, 'description' => $expense->description]);
+        $statement->execute(['id' => $expense->id,'userId' => $expense->userId, 'date' => $expense->date->format('Y-m-d H:i:s'), 'category' => $expense->category, 'amount' => $expense->amountCents, 'description' => $expense->description]);
     }
 
     public function delete(int $id): void

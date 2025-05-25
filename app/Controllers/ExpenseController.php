@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controllers;
 
 use App\Domain\Service\ExpenseService;
+use App\Infrastructure\Persistence\PdoExpenseRepository;
 use App\Infrastructure\Persistence\PdoUserRepository;
 use DateTimeImmutable;
 use Psr\Http\Message\ResponseInterface as Response;
@@ -19,6 +20,7 @@ class ExpenseController extends BaseController
         Twig $view,
         private readonly ExpenseService $expenseService,
         private readonly PdoUserRepository $userPdo,
+        private readonly PdoExpenseRepository $expensePdo,
     ) {
         parent::__construct($view);
     }
@@ -130,9 +132,22 @@ class ExpenseController extends BaseController
         // - load the expense to be edited by its ID (use route params to get it)
         // - check that the logged-in user is the owner of the edited expense, and fail with 403 if not
 
-        $expense = ['id' => 1];
+        $errors = [];
 
-        return $this->render($response, 'expenses/edit.twig', ['expense' => $expense, 'categories' => []]);
+        $userId = $_SESSION['user_id'];
+        $expenseId = (int) $routeParams['id'];
+
+        $categories = json_decode($_ENV['EXPENSE_CATEGORIES'], true);
+
+        $expense = $this->expensePdo->find($expenseId);
+        $date = $expense->date->format('Y-m-d');
+        
+        if($expense->userId !== $userId) {
+            $response = $response->withStatus(403);
+            $errors['user'] = 'Not alowed to edit this record!';
+        }
+
+        return $this->render($response, 'expenses/edit.twig', ['expense' => $expense, 'categories' => $categories, 'date' => $date, 'errors' => $errors]);
     }
 
     public function update(Request $request, Response $response, array $routeParams): Response
@@ -147,7 +162,27 @@ class ExpenseController extends BaseController
         // - rerender the "expenses.edit" page with included errors in case of failure
         // - redirect to the "expenses.index" page in case of success
 
-        return $response;
+        $errors = [];
+        $userId = $_SESSION['user_id'];
+        $expenseId = (int) $routeParams['id'];
+        $categories = json_decode($_ENV['EXPENSE_CATEGORIES'], true);
+
+        $expense = $this->expensePdo->find($expenseId);
+        $date = $expense->date->format('Y-m-d');
+
+        if($expense->userId !== $userId) {
+            $response = $response->withStatus(403);
+            $errors['user'] = 'Not alowed to edit this record!';
+
+            $this->render($response, 'expenses/edit.twig', ['expense' => $expense, 'categories' => $categories, 'date' => $date, 'errors' => $errors]);
+        }
+
+        $body = $request->getParsedBody();
+        $inputDate = new DateTimeImmutable($body['date']);
+
+        $this->expenseService->update($expense, (float) $body['amount'], $body['description'], $inputDate, $body['category'] );
+
+        return $response->withHeader('Location', '/expenses')->withStatus(302);
     }
 
     public function destroy(Request $request, Response $response, array $routeParams): Response
@@ -159,6 +194,18 @@ class ExpenseController extends BaseController
         // - call the repository method to delete the expense
         // - redirect to the "expenses.index" page
 
-        return $response;
+        $errors = [];
+        $userId = $_SESSION['user_id'];
+        $expenseId = (int) $routeParams['id'];
+        $expense = $this->expensePdo->find($expenseId);
+
+        if($expense->userId !== $userId) {
+            $response = $response->withStatus(403);
+            $errors['user'] = 'Not alowed to edit this record!';
+        }
+
+        $this->expensePdo->delete($expenseId);
+
+        return $response->withHeader('Location', '/expenses')->withStatus(302);
     }
 }
