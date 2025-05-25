@@ -58,6 +58,14 @@ class ExpenseService
         string $category,
     ): void {
         // TODO: implement this to update expense entity, perform validation, and persist
+        $categoryUpper = ucfirst($category);
+
+        $expense->amount = (int) ($amount * 100);
+        $expense->description = $description;
+        $expense->date = $date;
+        $expense->category = $categoryUpper;
+
+        $this->expenses->save($expense);
     }
 
     public function importFromCsv(User $user, UploadedFileInterface $csvFile): int
