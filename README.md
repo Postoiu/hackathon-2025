@@ -104,10 +104,19 @@ A solution with passing analysis and unit tests will receive extra points.
 ## Delivery details
 
 Participant:
-- Full name: ...
-- Email address: ...
+- Full name: Postoiu Ovidiu
+- Email address: postoiu.o@gmail.com
 
 Features fully implemented:
-- ...
+- Register
+- Login
+- Logout
+- Expenses - List
+- Expenses - Add
+- Expenses -Edit
+- Expenses - Delete
 
-Other instructions about setting up the application (if any): ...
+
+Other instructions about setting up the application (if any):
+I created a environment variable for expense categories:
+EXPENSE_CATEGORIES='{"groceries": "Groceries", "utilities": "Utilities", "transport": "Transport", "entertainment": "Transport", "housing": "Housing", "health": "Health", "other": "Other"}'
