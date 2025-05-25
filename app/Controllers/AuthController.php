@@ -66,6 +66,12 @@ class AuthController extends BaseController
     public function login(Request $request, Response $response): Response
     {
         // TODO: call corresponding service to perform user login, handle login failures
+        $credentials = $request->getParsedBody();
+        $loggedIn = $this->authService->attempt($credentials['username'], $credentials['password']);
+
+        if (! $loggedIn) {
+            return $this->render($response,'auth/login.twig', ['error' => 'Wrong username or password']);
+        }
 
         return $response->withHeader('Location', '/')->withStatus(302);
     }
@@ -73,6 +79,8 @@ class AuthController extends BaseController
     public function logout(Request $request, Response $response): Response
     {
         // TODO: handle logout by clearing session data and destroying session
+        session_unset();
+        session_destroy();
 
         return $response->withHeader('Location', '/login')->withStatus(302);
     }

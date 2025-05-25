@@ -35,8 +35,19 @@ class AuthService
     {
         // TODO: implement this for authenticating the user
         // TODO: make sur ethe user exists and the password matches
-        // TODO: don't forget to store in session user data needed afterwards
+        $passwordMatch = false;
+        $user = $this->users->findByUsername($username);
 
-        return true;
+        if ($user !== null) {
+            $passwordMatch = password_verify($password, $user->passwordHash);
+        }
+
+        // TODO: don't forget to store in session user data needed afterwards
+        if($user !== null && $passwordMatch) {
+            $_SESSION['user_id'] = $user->id;
+            $_SESSION['username'] = $user->username;
+        }
+
+        return $passwordMatch;
     }
 }
